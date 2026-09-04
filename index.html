@@ -1,0 +1,768 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RelatorIA · de la grabación de clase al cuaderno</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,600;1,6..72,400&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --papel:#EEF1F2; --papel-hondo:#E2E7E9; --tinta:#10222B; --tinta-suave:#4A5F68;
+  --acento:#0E6E78; --acento-vivo:#16929E; --aviso:#A8552F; --linea:#CBD5D8; --bien:#2E7D5B;
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--papel);color:var(--tinta);font:400 16px/1.55 "IBM Plex Sans",system-ui,sans-serif}
+main{max-width:940px;margin:0 auto;padding:0 24px 120px}
+
+header{padding:56px 0 8px}
+h1{font:600 clamp(34px,6vw,52px)/1.05 "Newsreader",Georgia,serif;margin:0 0 10px;letter-spacing:-.015em}
+header p{margin:0;max-width:62ch;color:var(--tinta-suave);font-size:17px}
+
+/* onda + línea de tiempo */
+.onda-caja{margin:32px 0 8px;background:var(--tinta);border-radius:3px;padding:14px;position:relative}
+canvas#onda{width:100%;height:110px;display:block}
+.onda-vacia{height:110px;display:grid;place-items:center;color:#5C7A88;font-size:14px;
+  background:repeating-linear-gradient(135deg,transparent 0 9px,#1B303C 9px 10px);border-radius:2px}
+.cursor{position:absolute;top:14px;bottom:14px;width:2px;background:var(--acento-vivo);left:14px;display:none}
+.onda-pie{display:flex;justify-content:space-between;color:var(--tinta-suave);font-size:13px;margin-bottom:40px}
+
+.paso{border-top:1px solid var(--linea);padding:28px 0}
+.paso[data-estado="bloqueado"]{opacity:.4;pointer-events:none}
+.paso h2{font:600 21px/1.25 "Newsreader",Georgia,serif;margin:0 0 4px;display:flex;align-items:baseline;gap:12px}
+.paso h2 .n{font:500 12px/1 "IBM Plex Sans",sans-serif;color:var(--acento);border:1px solid var(--acento);
+  border-radius:2px;padding:4px 6px;flex:0 0 auto}
+.paso h2 .hecho{color:var(--acento);font-size:13px;font-family:"IBM Plex Sans",sans-serif;font-weight:500}
+.paso > p{margin:0 0 18px;color:var(--tinta-suave);max-width:68ch}
+
+label{display:block;font-size:13px;font-weight:500;margin-bottom:5px;color:var(--tinta-suave)}
+input[type=text],input[type=password],select,textarea{width:100%;padding:9px 11px;border:1px solid var(--linea);
+  border-radius:2px;background:#fff;color:var(--tinta);font:400 15px/1.45 "IBM Plex Sans",sans-serif}
+textarea{resize:vertical;min-height:120px;font-size:14px}
+textarea.tiempo{font:400 13px/1.7 ui-monospace,SFMono-Regular,Menlo,monospace}
+input:focus-visible,select:focus-visible,textarea:focus-visible,button:focus-visible,.zona:focus-visible{
+  outline:2px solid var(--acento-vivo);outline-offset:2px}
+.rejilla{display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(190px,1fr))}
+button{font:500 15px/1 "IBM Plex Sans",sans-serif;padding:11px 20px;border-radius:2px;border:1px solid var(--tinta);
+  background:var(--tinta);color:#fff;cursor:pointer}
+button:hover:not(:disabled){background:#1B3946;border-color:#1B3946}
+button.secundario{background:transparent;color:var(--tinta)}
+button.secundario:hover:not(:disabled){background:var(--papel-hondo)}
+button:disabled{opacity:.45;cursor:not-allowed}
+.botonera{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:18px}
+
+.zona{border:1px dashed var(--acento);background:#fff;border-radius:2px;padding:34px 24px;text-align:center;cursor:pointer}
+.zona:hover,.zona.encima{background:#E6F0F1}
+.zona strong{display:block;font-size:17px;margin-bottom:4px}
+.zona span{color:var(--tinta-suave);font-size:14px}
+
+.motores{display:grid;gap:10px;margin-top:6px}
+.motor{border:1px solid var(--linea);background:#fff;padding:12px 14px;display:flex;gap:12px;align-items:flex-start}
+.motor input{margin-top:4px;width:auto}
+.motor .cuerpo{flex:1}
+.motor strong{display:block;font-size:15px}
+.motor small{color:var(--tinta-suave);font-size:13px;display:block;margin-top:2px}
+.motor .estado{font-size:12px;font-weight:600;padding:3px 7px;border-radius:2px;white-space:nowrap}
+.estado.ok{background:#E4F1EA;color:var(--bien)}
+.estado.no{background:#F4EDE9;color:var(--aviso)}
+.estado.gris{background:var(--papel-hondo);color:var(--tinta-suave)}
+
+.nota{font-size:13px;color:var(--tinta-suave);margin-top:10px;max-width:70ch}
+.alerta{border-left:3px solid var(--aviso);background:#FBF2ED;padding:12px 14px;font-size:14px;margin:16px 0;color:#6E3A20}
+.aviso-consentimiento{border-left:3px solid var(--acento);background:#E6F0F1;padding:12px 14px;font-size:14px;margin:16px 0}
+.registro{font:400 13px/1.6 ui-monospace,SFMono-Regular,Menlo,monospace;background:var(--tinta);color:#BFD4DB;
+  padding:14px 16px;border-radius:2px;max-height:180px;overflow-y:auto;white-space:pre-wrap;margin-top:16px;display:none}
+.registro.visible{display:block}
+.barra{height:3px;background:var(--papel-hondo);margin-top:16px;display:none}
+.barra.visible{display:block}
+.barra i{display:block;height:100%;background:var(--acento);width:0;transition:width .3s}
+
+.pestanas{display:flex;margin:18px 0 0;border-bottom:1px solid var(--linea)}
+.pestanas button{background:none;border:none;border-bottom:2px solid transparent;color:var(--tinta-suave);
+  padding:9px 14px;font-weight:500;border-radius:0}
+.pestanas button[aria-selected="true"]{color:var(--tinta);border-bottom-color:var(--acento)}
+.pestanas button:hover{background:var(--papel-hondo)}
+.panel{display:none;padding-top:18px}.panel.visible{display:block}
+audio{width:100%;margin-top:14px}
+footer{border-top:1px solid var(--linea);padding:26px 0;color:var(--tinta-suave);font-size:13px}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<main>
+
+<header>
+  <h1>De la grabación de clase al cuaderno</h1>
+  <p>RelatorIA transcribe una clase grabada y la convierte en dos cosas distintas: el cuaderno docente que el profesor publica, y los apuntes de estudio que el estudiante necesita. Con Chrome, la transcripción ocurre en tu propio equipo y el audio no sale de él.</p>
+</header>
+
+<div class="onda-caja">
+  <div class="onda-vacia" id="ondaVacia">Aquí aparecerá la onda de la grabación</div>
+  <canvas id="onda" width="1800" height="220" style="display:none"></canvas>
+  <div class="cursor" id="cursor"></div>
+</div>
+<div class="onda-pie">
+  <span id="ondaEstado">Sin grabación</span>
+  <span id="ondaDuracion"></span>
+</div>
+
+<!-- 1 -->
+<section class="paso" id="paso1" data-estado="activo">
+  <h2><span class="n">1</span> Quién eres y en qué idioma <span class="hecho" id="ok1"></span></h2>
+  <p>De esta elección depende todo lo que sale al final: el mismo audio produce material publicable o apuntes de estudio, que no son lo mismo.</p>
+
+  <div class="rejilla">
+    <div>
+      <label for="perfil">Qué necesitas</label>
+      <select id="perfil">
+        <option value="profesor">Soy el profesor · cuaderno docente</option>
+        <option value="estudiante">Soy estudiante · apuntes de estudio</option>
+        <option value="ambos" selected>Las dos cosas</option>
+      </select>
+    </div>
+    <div>
+      <label for="idiomaAudio">Idioma de la clase</label>
+      <select id="idiomaAudio"></select>
+    </div>
+    <div>
+      <label for="asignatura">Asignatura (opcional, mejora el resultado)</label>
+      <input type="text" id="asignatura" placeholder="p. ej. Bioestadística, 2.º curso">
+    </div>
+    <div>
+      <label for="clave">Clave de OpenAI · redacta el cuaderno</label>
+      <input type="password" id="clave" placeholder="sk-..." autocomplete="off">
+    </div>
+    <div>
+      <label for="modeloTexto">Modelo que redacta</label>
+      <input type="text" id="modeloTexto" value="gpt-4.1-mini">
+    </div>
+  </div>
+  <div class="botonera">
+    <button id="btnGuardarClave">Guardar clave en este navegador</button>
+    <button class="secundario" id="btnOlvidarClave">Olvidarla</button>
+  </div>
+  <div class="aviso-consentimiento">
+    En una grabación de clase se oye al profesor y, a veces, a los compañeros. Con el motor local de Chrome, el audio no sale de este ordenador y RelatorIA no guarda nada en ningún servidor. Aun así, grabar una clase requiere permiso de quien la imparte: la herramienta no te lo da.
+  </div>
+</section>
+
+<!-- 2 -->
+<section class="paso" id="paso2" data-estado="bloqueado">
+  <h2><span class="n">2</span> La grabación <span class="hecho" id="ok2"></span></h2>
+  <p>Sube un fichero de audio o de vídeo, o graba desde el micrófono si estás en clase ahora mismo.</p>
+
+  <div class="zona" id="zona" tabindex="0" role="button" aria-label="Elegir grabación">
+    <strong>Arrastra el audio o el vídeo aquí</strong>
+    <span>mp3, m4a, wav, ogg, webm, mp4 · o pulsa para elegirlo</span>
+  </div>
+  <input type="file" id="fichero" accept="audio/*,video/*" hidden>
+  <div class="botonera">
+    <button class="secundario" id="btnGrabar">Grabar desde el micrófono</button>
+    <button class="secundario" id="btnParar" disabled>Parar y usar lo grabado</button>
+  </div>
+  <div class="nota" id="notaAudio"></div>
+  <div class="nota">De un vídeo se extrae solo la pista de audio. Algún contenedor exótico puede no decodificarse: si falla, conviértelo a mp3 o m4a antes.</div>
+  <audio id="reproductor" controls style="display:none"></audio>
+</section>
+
+<!-- 3 -->
+<section class="paso" id="paso3" data-estado="bloqueado">
+  <h2><span class="n">3</span> La transcripción <span class="hecho" id="ok3"></span></h2>
+  <p>Tres motores, por orden de preferencia. El primero que esté disponible es el que conviene.</p>
+
+  <div class="motores" id="motores"></div>
+
+  <div class="rejilla" style="margin-top:16px">
+    <div>
+      <label for="velocidad">Velocidad de escucha</label>
+      <select id="velocidad">
+        <option value="1">1x · lo más fiel, tarda lo que dura la clase</option>
+        <option value="1.5">1.5x</option>
+        <option value="2" selected>2x · buen equilibrio</option>
+        <option value="3">3x · rápido, pierde palabras</option>
+      </select>
+    </div>
+  </div>
+  <div class="nota">Los motores de Chrome escuchan en tiempo real: acelerar la reproducción acorta la espera a cambio de precisión. Whisper no depende de esto, va a su ritmo.</div>
+
+  <div class="botonera">
+    <button id="btnTranscribir">Transcribir</button>
+    <button class="secundario" id="btnPararTr" disabled>Detener</button>
+  </div>
+  <div class="barra" id="barra3"><i></i></div>
+  <div class="registro" id="registro"></div>
+
+  <div style="margin-top:18px">
+    <label for="transcripcion">Transcripción con marcas de tiempo (editable)</label>
+    <textarea id="transcripcion" class="tiempo" style="min-height:260px" placeholder="[00:00] Aparecerá aquí según avance."></textarea>
+    <div class="nota" id="notaTr"></div>
+  </div>
+  <div class="botonera">
+    <button class="secundario" id="btnDescargarTxt" disabled>Descargar la transcripción</button>
+    <button class="secundario" id="btnDescargarSrt" disabled>Descargar .srt</button>
+  </div>
+</section>
+
+<!-- 4 -->
+<section class="paso" id="paso4" data-estado="bloqueado">
+  <h2><span class="n">4</span> El cuaderno <span class="hecho" id="ok4"></span></h2>
+  <p>De la misma transcripción salen dos documentos distintos. Cada sección lleva el minuto de la grabación donde se explicó, para poder volver a oírlo.</p>
+
+  <div class="botonera"><button id="btnRedactar">Redactar</button></div>
+  <div class="barra" id="barra4"><i></i></div>
+
+  <div id="zonaSalidas" style="display:none">
+    <div class="pestanas" role="tablist">
+      <button role="tab" id="tabProf" aria-selected="true">Cuaderno docente</button>
+      <button role="tab" id="tabEst" aria-selected="false">Apuntes de estudio</button>
+    </div>
+    <div class="panel visible" id="panelProf">
+      <textarea id="salidaProf" style="min-height:420px"></textarea>
+      <div class="botonera">
+        <button class="secundario" id="btnMdProf">Descargar .md</button>
+      </div>
+    </div>
+    <div class="panel" id="panelEst">
+      <textarea id="salidaEst" style="min-height:420px"></textarea>
+      <div class="botonera">
+        <button class="secundario" id="btnMdEst">Descargar .md</button>
+      </div>
+    </div>
+    <div class="botonera">
+      <button class="secundario" id="btnZip">Descargar todo (.zip)</button>
+    </div>
+  </div>
+</section>
+
+<footer>RelatorIA · herramienta abierta para docencia universitaria. La transcripción local no cuesta nada; la redacción se factura en tu cuenta de OpenAI.</footer>
+</main>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script>
+"use strict";
+
+const $ = id => document.getElementById(id);
+const API = "https://api.openai.com/v1";
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+const S = {
+  nombre:"", audioBuffer:null, blobAudio:null, duracion:0,
+  lineas:[],            // { t: segundos, texto }
+  motor:null, transcribiendo:false, abortar:false,
+  profesor:"", estudiante:""
+};
+
+/* ===================== idiomas ===================== */
+const IDIOMAS=[
+  ["es-ES","Español (España)"],["es-MX","Español (México)"],["es-AR","Español (Argentina)"],
+  ["ca-ES","Catalán"],["gl-ES","Gallego"],["eu-ES","Euskera"],
+  ["en-US","Inglés (EE. UU.)"],["en-GB","Inglés (Reino Unido)"],
+  ["fr-FR","Francés"],["de-DE","Alemán"],["it-IT","Italiano"],["pt-PT","Portugués"],["pt-BR","Portugués (Brasil)"],
+  ["nl-NL","Neerlandés"],["pl-PL","Polaco"],["ro-RO","Rumano"],["sv-SE","Sueco"],["da-DK","Danés"],
+  ["el-GR","Griego"],["cs-CZ","Checo"],["hu-HU","Húngaro"],["tr-TR","Turco"],["ru-RU","Ruso"],
+  ["ar-SA","Árabe"],["he-IL","Hebreo"],["hi-IN","Hindi"],["zh-CN","Chino mandarín"],
+  ["ja-JP","Japonés"],["ko-KR","Coreano"],["id-ID","Indonesio"],["vi-VN","Vietnamita"],["th-TH","Tailandés"]
+];
+(function(){
+  const s=$("idiomaAudio");
+  IDIOMAS.forEach(([v,t])=>{ const o=document.createElement("option"); o.value=v; o.textContent=t;
+    if(v==="es-ES") o.selected=true; s.appendChild(o); });
+})();
+const nombreIdioma=()=>(IDIOMAS.find(x=>x[0]===$("idiomaAudio").value)||["","español"])[1];
+
+/* ===================== utilidades ===================== */
+function log(t){ const r=$("registro"); r.classList.add("visible"); r.textContent+=t+"\n"; r.scrollTop=r.scrollHeight; }
+function barra(id,f){ const b=$(id); b.classList.add("visible"); b.querySelector("i").style.width=Math.round(f*100)+"%"; }
+function abrirPaso(n){ const p=$("paso"+n); if(p.dataset.estado==="bloqueado") p.dataset.estado="activo"; }
+function marcar(n,t){ $("ok"+n).textContent=t?"· "+t:""; }
+function reloj(s){ const m=Math.floor(s/60), g=Math.floor(s%60); return `${String(m).padStart(2,"0")}:${String(g).padStart(2,"0")}`; }
+function relojSrt(s){
+  const h=Math.floor(s/3600),m=Math.floor(s%3600/60),g=Math.floor(s%60),ms=Math.round((s-Math.floor(s))*1000);
+  return `${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}:${String(g).padStart(2,"0")},${String(ms).padStart(3,"0")}`;
+}
+function descargar(blob,nombre){
+  const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download=nombre; a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href),4000);
+}
+function limpiarNombre(s){
+  return (s||"clase").replace(/\.[^.]+$/,"").replace(/[^\w\-áéíóúñÁÉÍÓÚÑ ]+/g,"").trim().replace(/\s+/g,"_");
+}
+
+/* ===================== clave ===================== */
+const CLAVE="ia_openai_key";
+$("clave").value=localStorage.getItem(CLAVE)||"";
+$("btnGuardarClave").onclick=()=>{ const v=$("clave").value.trim(); if(!v)return;
+  localStorage.setItem(CLAVE,v); marcar(1,"clave guardada"); };
+$("btnOlvidarClave").onclick=()=>{ localStorage.removeItem(CLAVE); $("clave").value=""; marcar(1,""); };
+const laClave=()=>$("clave").value.trim();
+abrirPaso(2);
+
+/* ===================== audio ===================== */
+let ac=null;
+const audioCtx=()=>(ac||=new (window.AudioContext||window.webkitAudioContext)());
+
+async function cargarAudio(blob,nombre){
+  S.nombre=limpiarNombre(nombre);
+  $("notaAudio").textContent="Decodificando…";
+  const buf=await audioCtx().decodeAudioData(await blob.arrayBuffer());
+  S.audioBuffer=buf; S.blobAudio=blob; S.duracion=buf.duration;
+  dibujarOnda(buf);
+  const r=$("reproductor"); r.src=URL.createObjectURL(blob); r.style.display="block";
+  $("notaAudio").textContent=`${nombre} · ${reloj(buf.duration)} · ${buf.sampleRate} Hz`;
+  $("ondaEstado").textContent=nombre;
+  $("ondaDuracion").textContent=reloj(buf.duration);
+  marcar(2,reloj(buf.duration));
+  abrirPaso(3);
+  await sondearMotores();
+}
+
+function dibujarOnda(buf){
+  const c=$("onda"); $("ondaVacia").style.display="none"; c.style.display="block";
+  const ctx=c.getContext("2d"), W=c.width, H=c.height;
+  ctx.clearRect(0,0,W,H);
+  const datos=buf.getChannelData(0), cubos=600, paso=Math.floor(datos.length/cubos);
+  const ancho=W/cubos;
+  ctx.fillStyle="#2C6E8A";
+  for(let i=0;i<cubos;i++){
+    let max=0;
+    for(let j=0;j<paso;j+=16){ const v=Math.abs(datos[i*paso+j]||0); if(v>max) max=v; }
+    const h=Math.max(2,max*H*0.92);
+    ctx.fillRect(i*ancho, (H-h)/2, Math.max(1,ancho-1), h);
+  }
+}
+function moverCursor(frac){
+  const cur=$("cursor"), caja=document.querySelector(".onda-caja");
+  if(!caja) return;
+  cur.style.display="block";
+  cur.style.left=(14+Math.max(0,Math.min(1,frac))*(caja.clientWidth-28))+"px";
+}
+
+$("zona").onclick=()=>$("fichero").click();
+$("zona").onkeydown=e=>{ if(e.key==="Enter"||e.key===" "){e.preventDefault();$("fichero").click();} };
+$("fichero").onchange=e=>{ const f=e.target.files[0]; if(f) cargarAudio(f,f.name).catch(err=>
+  $("notaAudio").innerHTML='<div class="alerta">No se pudo leer el audio. '+err.message+"</div>"); };
+["dragenter","dragover"].forEach(ev=>$("zona").addEventListener(ev,e=>{e.preventDefault();$("zona").classList.add("encima");}));
+["dragleave","drop"].forEach(ev=>$("zona").addEventListener(ev,e=>{e.preventDefault();$("zona").classList.remove("encima");}));
+$("zona").addEventListener("drop",e=>{ const f=e.dataTransfer.files[0];
+  if(f) cargarAudio(f,f.name).catch(err=>$("notaAudio").innerHTML='<div class="alerta">'+err.message+"</div>"); });
+
+/* --- grabación en vivo --- */
+let grabadorMic=null, trozosMic=[];
+$("btnGrabar").onclick=async()=>{
+  try{
+    const flujo=await navigator.mediaDevices.getUserMedia({audio:true});
+    trozosMic=[];
+    grabadorMic=new MediaRecorder(flujo);
+    grabadorMic.ondataavailable=e=>{ if(e.data.size) trozosMic.push(e.data); };
+    grabadorMic.onstop=async()=>{
+      flujo.getTracks().forEach(t=>t.stop());
+      const blob=new Blob(trozosMic,{type:grabadorMic.mimeType||"audio/webm"});
+      await cargarAudio(blob,"clase_grabada.webm");
+    };
+    grabadorMic.start(1000);
+    $("btnGrabar").disabled=true; $("btnParar").disabled=false;
+    $("notaAudio").textContent="Grabando… deja esta pestaña abierta.";
+  }catch(e){ $("notaAudio").innerHTML='<div class="alerta">No se pudo acceder al micrófono. '+e.message+"</div>"; }
+};
+$("btnParar").onclick=()=>{
+  if(grabadorMic && grabadorMic.state!=="inactive") grabadorMic.stop();
+  $("btnGrabar").disabled=false; $("btnParar").disabled=true;
+};
+
+/* ===================== motores de transcripción ===================== */
+const MOTORES=[
+  {id:"local", titulo:"Chrome, en este equipo",
+   desc:"El audio no sale del ordenador y no cuesta nada. Necesita Chrome o Edge 139 o superior, y descargar una vez el paquete del idioma."},
+  {id:"nube", titulo:"Chrome, reconocimiento remoto",
+   desc:"No cuesta nada, pero el audio se envía a los servidores del navegador. Para una clase con estudiantes dentro, piénsatelo."},
+  {id:"whisper", titulo:"Whisper, con tu clave de OpenAI",
+   desc:"Funciona en cualquier navegador y da las marcas de tiempo más exactas. Cuesta unos treinta céntimos por cada cincuenta minutos."}
+];
+
+function pintarMotores(estados){
+  $("motores").innerHTML=MOTORES.map(m=>{
+    const e=estados[m.id]||{clase:"gris",txt:"comprobando"};
+    return `<label class="motor">
+      <input type="radio" name="motor" value="${m.id}" ${e.sel?"checked":""} ${e.bloq?"disabled":""}>
+      <span class="cuerpo"><strong>${m.titulo}</strong><small>${m.desc}</small>
+        ${e.extra?`<small style="color:var(--aviso)">${e.extra}</small>`:""}</span>
+      <span class="estado ${e.clase}">${e.txt}</span>
+    </label>`;
+  }).join("");
+  $("motores").querySelectorAll('input[name=motor]').forEach(r=>{
+    r.onchange=()=>{ S.motor=r.value; };
+  });
+  const sel=$("motores").querySelector('input[name=motor]:checked');
+  S.motor=sel?sel.value:null;
+}
+
+async function sondearMotores(){
+  const est={};
+  const lang=$("idiomaAudio").value;
+
+  if(!SR){
+    est.local={clase:"no",txt:"no disponible",bloq:true,extra:"Este navegador no tiene reconocimiento de voz."};
+    est.nube={clase:"no",txt:"no disponible",bloq:true};
+  }else{
+    est.nube={clase:"ok",txt:"disponible"};
+    if(typeof SR.available!=="function"){
+      est.local={clase:"no",txt:"no disponible",bloq:true,
+        extra:"Tu versión de Chrome no trae el motor local; hace falta la 139 o superior."};
+    }else{
+      try{
+        const d=await SR.available({langs:[lang],processLocally:true});
+        if(d==="available") est.local={clase:"ok",txt:"listo",sel:true};
+        else if(d==="downloadable"||d==="downloading")
+          est.local={clase:"gris",txt:d==="downloading"?"descargando":"hay que descargarlo",
+            extra:"Al pulsar Transcribir se descargará el paquete de "+nombreIdioma()+". Puede tardar unos minutos la primera vez."};
+        else est.local={clase:"no",txt:"sin este idioma",bloq:true,
+          extra:"El motor local no cubre "+nombreIdioma()+" en este equipo."};
+      }catch(e){ est.local={clase:"no",txt:"no disponible",bloq:true,extra:e.message}; }
+    }
+  }
+  est.whisper=laClave()
+    ? {clase:"ok",txt:"disponible"}
+    : {clase:"gris",txt:"falta la clave",bloq:true,extra:"Escribe tu clave de OpenAI en el paso 1."};
+
+  if(!est.local.sel){
+    if(!est.local.bloq) est.local.sel=true;
+    else if(!est.whisper.bloq) est.whisper.sel=true;
+    else if(!est.nube.bloq) est.nube.sel=true;
+  }
+  pintarMotores(est);
+}
+$("idiomaAudio").onchange=()=>{ if(S.audioBuffer) sondearMotores(); };
+$("clave").addEventListener("input",()=>{ if(S.audioBuffer) sondearMotores(); });
+
+/* ===================== transcripción ===================== */
+function volcarLineas(){
+  $("transcripcion").value=S.lineas.map(l=>`[${reloj(l.t)}] ${l.texto}`).join("\n");
+  $("transcripcion").scrollTop=$("transcripcion").scrollHeight;
+  const pal=S.lineas.reduce((a,l)=>a+l.texto.split(/\s+/).length,0);
+  $("notaTr").textContent=`${S.lineas.length} fragmentos · ${pal.toLocaleString("es")} palabras`;
+}
+function leerLineas(){
+  const out=[];
+  for(const l of $("transcripcion").value.split("\n")){
+    const m=l.match(/^\s*\[(\d+):(\d+)\]\s*(.*)$/);
+    if(m) out.push({t:+m[1]*60 + +m[2], texto:m[3].trim()});
+    else if(l.trim() && out.length) out[out.length-1].texto+=" "+l.trim();
+  }
+  return out.filter(l=>l.texto);
+}
+
+$("btnPararTr").onclick=()=>{ S.abortar=true; log("Detención pedida…"); };
+
+$("btnTranscribir").onclick=async()=>{
+  if(!S.motor){ log("Elige un motor."); return; }
+  const b=$("btnTranscribir"); b.disabled=true; b.textContent="Transcribiendo…";
+  $("btnPararTr").disabled=false; $("registro").textContent="";
+  S.lineas=[]; S.abortar=false; S.transcribiendo=true;
+  try{
+    if(S.motor==="whisper") await transcribirWhisper();
+    else await transcribirChrome(S.motor==="local");
+    volcarLineas();
+    if(S.lineas.length){
+      $("btnDescargarTxt").disabled=false; $("btnDescargarSrt").disabled=false;
+      marcar(3,S.lineas.length+" fragmentos"); abrirPaso(4);
+    }
+  }catch(e){ log("ERROR · "+e.message); }
+  finally{
+    S.transcribiendo=false; $("cursor").style.display="none";
+    b.disabled=false; b.textContent="Volver a transcribir"; $("btnPararTr").disabled=true;
+  }
+};
+
+/* --- motores de Chrome --- */
+async function transcribirChrome(local){
+  const lang=$("idiomaAudio").value;
+  if(local && typeof SR.install==="function"){
+    const d=await SR.available({langs:[lang],processLocally:true});
+    if(d!=="available"){
+      log("Descargando el paquete de voz de "+nombreIdioma()+". La primera vez tarda.");
+      const ok=await SR.install({langs:[lang],processLocally:true});
+      if(!ok) throw new Error("No se pudo instalar el paquete de voz. Prueba con Whisper.");
+      log("Paquete instalado.");
+    }
+  }
+
+  const ctx=audioCtx(); await ctx.resume();
+  const vel=parseFloat($("velocidad").value);
+  const fuente=ctx.createBufferSource();
+  fuente.buffer=S.audioBuffer; fuente.playbackRate.value=vel;
+  const destino=ctx.createMediaStreamDestination();
+  fuente.connect(destino);
+  const pista=destino.stream.getAudioTracks()[0];
+
+  let t0=0, vivo=true, rec=null;
+  const posicion=()=>Math.min(S.duracion,(ctx.currentTime-t0)*vel);
+
+  function nuevoReconocedor(){
+    const r=new SR();
+    r.lang=lang; r.continuous=true; r.interimResults=true;
+    if(local) r.processLocally=true;
+    let tramoInicio=null;
+    r.onresult=ev=>{
+      for(let i=ev.resultIndex;i<ev.results.length;i++){
+        const res=ev.results[i];
+        if(tramoInicio===null) tramoInicio=posicion();
+        if(res.isFinal){
+          const texto=res[0].transcript.trim();
+          if(texto) S.lineas.push({t:tramoInicio,texto});
+          tramoInicio=null;
+          if(S.lineas.length%4===0) volcarLineas();
+        }
+      }
+    };
+    r.onerror=ev=>{
+      if(ev.error==="no-speech"||ev.error==="aborted") return;
+      log("Aviso del reconocedor: "+ev.error);
+      if(ev.error==="language-not-supported"||ev.error==="service-not-allowed") vivo=false;
+    };
+    r.onend=()=>{ if(vivo && !S.abortar){ try{ r.start(pista); }catch(e){} } };
+    return r;
+  }
+
+  rec=nuevoReconocedor();
+  t0=ctx.currentTime;
+  try{ rec.start(pista); }
+  catch(e){ throw new Error("Este Chrome no acepta transcribir un fichero (falta el soporte de MediaStreamTrack). Usa Whisper."); }
+  fuente.start();
+
+  log(`Escuchando a ${vel}x. Tiempo estimado: ${reloj(S.duracion/vel)}.`);
+  await new Promise(res=>{
+    const reloj_=setInterval(()=>{
+      const p=posicion();
+      barra("barra3",p/S.duracion); moverCursor(p/S.duracion);
+      if(p>=S.duracion-0.05 || S.abortar || !vivo){ clearInterval(reloj_); res(); }
+    },250);
+  });
+
+  vivo=false;
+  await new Promise(r=>setTimeout(r,1200));   // deja cerrar el último tramo
+  try{ rec.stop(); }catch(e){}
+  try{ fuente.stop(); }catch(e){}
+  if(!S.lineas.length) throw new Error("No se reconoció nada. Prueba a 1x, o cambia de motor.");
+}
+
+/* --- Whisper --- */
+function aWav(buffer){
+  const n=buffer.length, datos=buffer.getChannelData(0);
+  const ab=new ArrayBuffer(44+n*2), v=new DataView(ab);
+  const txt=(off,s)=>{ for(let i=0;i<s.length;i++) v.setUint8(off+i,s.charCodeAt(i)); };
+  txt(0,"RIFF"); v.setUint32(4,36+n*2,true); txt(8,"WAVE"); txt(12,"fmt ");
+  v.setUint32(16,16,true); v.setUint16(20,1,true); v.setUint16(22,1,true);
+  v.setUint32(24,buffer.sampleRate,true); v.setUint32(28,buffer.sampleRate*2,true);
+  v.setUint16(32,2,true); v.setUint16(34,16,true); txt(36,"data"); v.setUint32(40,n*2,true);
+  let o=44;
+  for(let i=0;i<n;i++){ const s=Math.max(-1,Math.min(1,datos[i])); v.setInt16(o,s*0x7FFF,true); o+=2; }
+  return new Blob([ab],{type:"audio/wav"});
+}
+
+async function trozoWav(desde,hasta){
+  const sr=16000, largo=Math.round((hasta-desde)*sr);
+  const off=new OfflineAudioContext(1,largo,sr);
+  const f=off.createBufferSource(); f.buffer=S.audioBuffer;
+  f.connect(off.destination); f.start(0,desde,hasta-desde);
+  return aWav(await off.startRendering());
+}
+
+async function transcribirWhisper(){
+  if(!laClave()) throw new Error("Falta la clave de OpenAI.");
+  const TROZO=600;                                   // 10 min ≈ 19 MB de WAV a 16 kHz
+  const n=Math.ceil(S.duracion/TROZO);
+  log(`Whisper: ${n} trozo(s) de hasta diez minutos.`);
+  for(let i=0;i<n;i++){
+    if(S.abortar) break;
+    const desde=i*TROZO, hasta=Math.min(S.duracion,(i+1)*TROZO);
+    log(`  trozo ${i+1}/${n}: ${reloj(desde)}–${reloj(hasta)}`);
+    const wav=await trozoWav(desde,hasta);
+    const fd=new FormData();
+    fd.append("file",wav,`trozo_${i}.wav`);
+    fd.append("model","whisper-1");
+    fd.append("language",$("idiomaAudio").value.split("-")[0]);
+    fd.append("response_format","verbose_json");
+    const r=await fetch(API+"/audio/transcriptions",{method:"POST",
+      headers:{Authorization:"Bearer "+laClave()},body:fd});
+    if(!r.ok) throw new Error("Whisper "+r.status+": "+(await r.text()).slice(0,200));
+    const d=await r.json();
+    (d.segments||[{start:0,text:d.text}]).forEach(s=>{
+      const texto=(s.text||"").trim();
+      if(texto) S.lineas.push({t:desde+(s.start||0),texto});
+    });
+    volcarLineas();
+    barra("barra3",(i+1)/n); moverCursor((i+1)/n);
+  }
+}
+
+$("btnDescargarTxt").onclick=()=>
+  descargar(new Blob([$("transcripcion").value],{type:"text/plain"}),S.nombre+"_transcripcion.txt");
+$("btnDescargarSrt").onclick=()=>{
+  const l=leerLineas();
+  const srt=l.map((x,i)=>{
+    const fin=i<l.length-1?l[i+1].t:x.t+5;
+    return `${i+1}\n${relojSrt(x.t)} --> ${relojSrt(fin)}\n${x.texto}\n`;
+  }).join("\n");
+  descargar(new Blob([srt],{type:"text/plain"}),S.nombre+".srt");
+};
+
+/* ===================== redacción ===================== */
+async function chat(mensajes,alTrozo){
+  const cuerpo={model:$("modeloTexto").value.trim()||"gpt-4.1-mini",messages:mensajes,stream:!!alTrozo};
+  const r=await fetch(API+"/chat/completions",{method:"POST",
+    headers:{"Content-Type":"application/json",Authorization:"Bearer "+laClave()},body:JSON.stringify(cuerpo)});
+  if(!r.ok) throw new Error("La API respondió "+r.status+": "+(await r.text()).slice(0,300));
+  if(!alTrozo) return (await r.json()).choices[0].message.content;
+  const lector=r.body.getReader(), dec=new TextDecoder();
+  let resto="",texto="";
+  for(;;){
+    const {done,value}=await lector.read(); if(done) break;
+    resto+=dec.decode(value,{stream:true});
+    const ls=resto.split("\n"); resto=ls.pop();
+    for(const l of ls){
+      if(!l.startsWith("data: ")) continue;
+      const c=l.slice(6).trim(); if(c==="[DONE]") continue;
+      try{ const t=JSON.parse(c).choices?.[0]?.delta?.content; if(t){ texto+=t; alTrozo(texto); } }catch(e){}
+    }
+  }
+  return texto;
+}
+
+const COMUN=`Trabajas sobre la transcripción automática de una clase universitaria grabada. Cada fragmento va precedido de su minuto en la grabación.
+
+Reglas que no se negocian:
+- No inventes. Si algo se oye mal o quedó a medias, escríbelo como "(no se entiende en el minuto MM:SS)" en lugar de completarlo.
+- La transcripción trae errores de reconocimiento. Corrige los evidentes por el contexto (nombres técnicos, cifras), pero si una cifra o un nombre propio es dudoso, márcalo con "(?)".
+- Conserva los minutos: cada sección lleva delante su marca [MM:SS] para poder volver a escuchar.
+- No transcribas: redacta. Ordena lo dicho, quita las repeticiones y las muletillas, y respeta el orden de la clase.
+- Frases cortas, voz activa, sin superlativos.
+- Escribe en ${""}`;
+
+function idiomaTexto(){ return nombreIdioma().replace(/\s*\(.*\)/,""); }
+function contexto(){
+  const a=$("asignatura").value.trim();
+  return a?`\n\nContexto: la clase es de ${a}.`:"";
+}
+
+const SIS_PROF=lang=>COMUN+lang+`.
+
+Devuelve SOLO Markdown, con esta estructura:
+# Título de la sesión
+Una línea con el tema y la duración.
+
+## De qué fue esta clase
+Tres o cuatro líneas.
+
+## Objetivos que cubre
+Los que se deducen de lo explicado, con verbos observables. No los inventes: si la clase no cubre un objetivo, no lo pongas.
+
+## Desarrollo
+Secciones numeradas con su marca [MM:SS]. Cada una: qué se explicó, con los ejemplos y las cifras que se dieron. Si se resolvió un ejercicio, recoge el planteamiento y el resultado.
+
+## Lo que preguntaron en clase
+Cada pregunta del alumnado con la respuesta que se dio y su minuto. Si no hubo preguntas, escribe que no las hubo.
+
+## Ejercicios propuestos
+Los que se mandaron, y si no se mandó ninguno, tres que encajen con lo explicado.
+
+## Glosario
+Tabla con los términos introducidos y su definición tal como se dio en clase.
+
+## Quedó pendiente
+Lo que se dijo que se vería otro día.
+
+## Avisos
+Fechas, entregas, exámenes o cambios de aula mencionados. Si no hubo, omite esta sección entera.`;
+
+const SIS_EST=lang=>COMUN+lang+`.
+
+Escribes para el estudiante que estuvo en esa clase o que se la perdió. Devuelve SOLO Markdown:
+
+# Apuntes de la sesión
+Una frase con lo que hay que llevarse de esta clase.
+
+## Antes de seguir
+Los conceptos previos que el profesor dio por sabidos y conviene repasar.
+
+## Apuntes
+Secciones con su marca [MM:SS], en el orden de la clase. Lo importante en negrita. Recoge las cifras, las fórmulas y los ejemplos concretos.
+
+## Esto no está en los apuntes oficiales
+Lo que el profesor dijo de viva voz y no suele estar en el material: matices, advertencias, "esto suele caer", errores típicos, cómo lo quiere resuelto. Es la sección más valiosa; si no hay nada, dilo, pero busca bien.
+
+## Fechas y avisos
+Todo lo que tenga fecha o consecuencia administrativa, con su minuto.
+
+## Dudas que quedaron en el aire
+Lo que se preguntó y no se respondió del todo, para preguntarlo en tutoría.
+
+## Ponte a prueba
+Ocho preguntas sobre lo explicado, cada una con la respuesta plegada así:
+<details><summary>Ver respuesta</summary>La respuesta.</details>`;
+
+$("btnRedactar").onclick=async()=>{
+  if(!laClave()){ alert("Hace falta la clave de OpenAI para redactar el cuaderno."); return; }
+  const b=$("btnRedactar"); b.disabled=true; b.textContent="Redactando…";
+  const perfil=$("perfil").value;
+  const lineas=leerLineas();
+  let tr=lineas.map(l=>`[${reloj(l.t)}] ${l.texto}`).join("\n");
+  const LIMITE=120000;
+  if(tr.length>LIMITE){
+    log(`La transcripción ocupa ${tr.length} caracteres; se envían los primeros ${LIMITE}.`);
+    tr=tr.slice(0,LIMITE);
+  }
+  const usuario=`Transcripción de la clase (duración ${reloj(S.duracion)}):\n\n${tr}${contexto()}`;
+  $("zonaSalidas").style.display="";
+  const lang=idiomaTexto();
+
+  try{
+    if(perfil!=="estudiante"){
+      pestana("prof");
+      barra("barra4",0.05);
+      S.profesor=await chat([{role:"system",content:SIS_PROF(lang)},{role:"user",content:usuario}],
+        t=>{ $("salidaProf").value=t; barra("barra4",Math.min(0.45,t.length/9000)); });
+    }
+    if(perfil!=="profesor"){
+      pestana("est");
+      barra("barra4",0.5);
+      S.estudiante=await chat([{role:"system",content:SIS_EST(lang)},{role:"user",content:usuario}],
+        t=>{ $("salidaEst").value=t; barra("barra4",Math.min(0.98,0.5+t.length/18000)); });
+    }
+    barra("barra4",1);
+    marcar(4,perfil==="ambos"?"dos documentos":"listo");
+  }catch(e){
+    const d=perfil==="estudiante"?"salidaEst":"salidaProf";
+    $(d).value="No se pudo redactar.\n\n"+e.message;
+  }finally{ b.disabled=false; b.textContent="Volver a redactar"; }
+};
+
+function pestana(cual){
+  const prof=cual==="prof";
+  $("tabProf").setAttribute("aria-selected",prof);
+  $("tabEst").setAttribute("aria-selected",!prof);
+  $("panelProf").classList.toggle("visible",prof);
+  $("panelEst").classList.toggle("visible",!prof);
+}
+$("tabProf").onclick=()=>pestana("prof");
+$("tabEst").onclick=()=>pestana("est");
+
+$("btnMdProf").onclick=()=>descargar(new Blob([$("salidaProf").value],{type:"text/markdown"}),S.nombre+"_cuaderno_docente.md");
+$("btnMdEst").onclick=()=>descargar(new Blob([$("salidaEst").value],{type:"text/markdown"}),S.nombre+"_apuntes.md");
+
+$("btnZip").onclick=async()=>{
+  const zip=new JSZip();
+  zip.file("transcripcion.txt",$("transcripcion").value);
+  if($("salidaProf").value) zip.file("cuaderno_docente.md",$("salidaProf").value);
+  if($("salidaEst").value) zip.file("apuntes_estudio.md",$("salidaEst").value);
+  const l=leerLineas();
+  zip.file("transcripcion.srt",l.map((x,i)=>{
+    const fin=i<l.length-1?l[i+1].t:x.t+5;
+    return `${i+1}\n${relojSrt(x.t)} --> ${relojSrt(fin)}\n${x.texto}\n`;
+  }).join("\n"));
+  descargar(await zip.generateAsync({type:"blob"}),S.nombre+"_relatoria.zip");
+};
+</script>
+</body>
+</html>
