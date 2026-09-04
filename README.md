@@ -51,6 +51,16 @@ quiere que se resuelva algo—. Es la razón de ser de la salida del estudiante.
 En ambas, lo que no se entiende se marca como tal en vez de completarse, y las cifras o
 nombres dudosos llevan un `(?)`.
 
+## Formatos de salida
+
+Cada documento se descarga en **Markdown** y en **Word**. El `.docx` se construye en el
+propio navegador, sin librerías externas: encabezados con estilos reales —así funciona el
+panel de navegación de Word—, negritas y cursivas, tablas con cabecera sombreada, bloques
+de código y citas. Las preguntas de autoevaluación, que en Markdown van plegadas, salen
+desplegadas y marcadas, porque Word no pliega.
+
+El zip lleva las dos versiones de cada documento, la transcripción en texto y el `.srt`.
+
 ## Grabar una clase
 
 En una grabación de aula se oye al profesor y a veces a los compañeros. Que el motor local
